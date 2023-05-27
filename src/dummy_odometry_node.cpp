@@ -48,6 +48,7 @@
 
 #include <dummy_odometry_node_parameters.hpp>
 
+#include <dummy_odometry/converter/eigen.hpp>
 
 namespace dummy_odometry
 {
@@ -241,82 +242,6 @@ void DummyOdometryNode::commandVelocityCallback(geometry_msgs::msg::Twist::Const
   m_command_velocity->twist = *msg;
   m_command_velocity->header.stamp = this->get_clock()->now();
   m_command_velocity->header.frame_id = m_params->child_frame_id;
-}
-
-template<typename Scalar>
-void eigenVectorFromRosVector3(
-  const geometry_msgs::msg::Vector3 & msg,
-  Eigen::Matrix<Scalar, 3, 1> & vec)
-{
-  vec.x() = static_cast<Scalar>(msg.x);
-  vec.y() = static_cast<Scalar>(msg.y);
-  vec.z() = static_cast<Scalar>(msg.z);
-}
-
-template<typename Scalar>
-void eigenVectorFromRosPoint3(
-  const geometry_msgs::msg::Point & msg,
-  Eigen::Matrix<Scalar, 3, 1> & vec)
-{
-  vec.x() = static_cast<Scalar>(msg.x);
-  vec.y() = static_cast<Scalar>(msg.y);
-  vec.z() = static_cast<Scalar>(msg.z);
-}
-
-template<typename Scalar>
-void rosVector3FromEigenVector3(
-  const Eigen::Matrix<Scalar, 3, 1> & vec,
-  geometry_msgs::msg::Vector3 & msg)
-{
-  msg.x = static_cast<double>(vec.x());
-  msg.y = static_cast<double>(vec.y());
-  msg.z = static_cast<double>(vec.z());
-}
-
-template<typename Scalar>
-void rosVector3FromEigenPoint3(
-  const Eigen::Matrix<Scalar, 3, 1> & vec,
-  geometry_msgs::msg::Point & msg)
-{
-  msg.x = static_cast<double>(vec.x());
-  msg.y = static_cast<double>(vec.y());
-  msg.z = static_cast<double>(vec.z());
-}
-
-template<typename Scalar>
-void eigenQuaternionFromRosVector3(
-  const geometry_msgs::msg::Vector3 & msg,
-  Eigen::Quaternion<Scalar> & q,
-  const Scalar scaler = 1)
-{
-  q = Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.z), Eigen::Vector3<Scalar>::UnitZ());
-  q = q * Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.y), Eigen::Vector3<Scalar>::UnitY());
-  q = q * Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.x), Eigen::Vector3<Scalar>::UnitX());
-}
-
-template<typename Scalar>
-void eigenQuaternionFromRosQuaternion(
-  const geometry_msgs::msg::Quaternion & msg,
-  Eigen::Quaternion<Scalar> & q)
-{
-  q.x() = static_cast<Scalar>(msg.x);
-  q.y() = static_cast<Scalar>(msg.y);
-  q.z() = static_cast<Scalar>(msg.z);
-  q.w() = static_cast<Scalar>(msg.w);
-}
-
-template<typename Scalar>
-void rosQuaternionFromEigenQuaternion(
-  const Eigen::Quaternion<Scalar> & q,
-  geometry_msgs::msg::Quaternion & msg)
-{
-  msg.x = static_cast<double>(q.x());
-  msg.y = static_cast<double>(q.y());
-  msg.z = static_cast<double>(q.z());
-  msg.w = static_cast<double>(q.w());
 }
 
 void DummyOdometryNode::updateOdometryCallback()

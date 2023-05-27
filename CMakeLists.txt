@@ -21,6 +21,10 @@ target_link_libraries(dummy_odometry_components
   Eigen3::Eigen
   dummy_odometry_node_parameters
 )
+target_include_directories(dummy_odometry_components
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 rclcpp_components_register_node(dummy_odometry_components
   PLUGIN "dummy_odometry::DummyOdometryNode"
   EXECUTABLE dummy_odometry_node
