@@ -33,12 +33,18 @@ dummy_odometry_node:
       not_empty<>:
   require_command_timestamp:
     type: bool
-    default_value: true
+    default_value: false
     description: Require command with timestamp
   update_odometry_frequency:
     type: double
-    default_value: 10
+    default_value: 20
     description: Odometry update frequecny (Hz)
+    validation:
+      gt_eq<>: 0
+  publish_odometry_frequency:
+    type: double
+    default_value: 10
+    description: Odometry publish frequecny (Hz)
     validation:
       gt_eq<>: 0
   wait_command_seconds:
@@ -60,96 +66,3 @@ dummy_odometry_node:
       one_of<>:
         -
           - sum
-  spring:
-    x:
-      type: double
-      default_value: 0.0
-    y:
-      type: double
-      default_value: 0.0
-    z:
-      type: double
-      default_value: 0.0
-    roll:
-      type: double
-      default_value: 0.0
-    pitch:
-      type: double
-      default_value: 0.0
-    yaw:
-      type: double
-      default_value: 0.0
-  dampa:
-    x:
-      type: double
-      default_value: 0.0
-    y:
-      type: double
-      default_value: 0.0
-    z:
-      type: double
-      default_value: 0.0
-    roll:
-      type: double
-      default_value: 0.0
-    pitch:
-      type: double
-      default_value: 0.0
-    yaw:
-      type: double
-      default_value: 0.0
-  gaussian_noise:
-    x:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean X axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev X axis
-    y:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean Y axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev Y axis
-    z:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean Z axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev Z axis
-    roll:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean roll axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev roll axis
-    pitch:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean pitch axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev pitch axis
-    yaw:
-      mean:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise mean yaw axis
-      stddev:
-        type: double
-        default_value: 0.0
-        description: Gaussian noise stddev yaw axis
