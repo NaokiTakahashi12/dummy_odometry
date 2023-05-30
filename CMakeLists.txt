@@ -14,23 +14,50 @@ ament_auto_find_build_dependencies()
 generate_parameter_library(dummy_odometry_node_parameters
   src/dummy_odometry_node_parameters.yaml
 )
+
+add_library(dummy_odometry SHARED)
+target_sources(dummy_odometry
+  PRIVATE
+    src/simple_dynamics.cpp
+    src/state_space/mdk.cpp
+)
+target_link_libraries(dummy_odometry
+  PUBLIC
+    Eigen3::Eigen
+)
+target_compile_features(dummy_odometry
+  PRIVATE
+    cxx_std_20
+)
+target_include_directories(dummy_odometry
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 ament_auto_add_library(dummy_odometry_components SHARED
   src/dummy_odometry_node.cpp
 )
 target_link_libraries(dummy_odometry_components
   Eigen3::Eigen
   dummy_odometry_node_parameters
+  dummy_odometry
 )
 target_include_directories(dummy_odometry_components
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_features(dummy_odometry_components
+  PRIVATE
+    cxx_std_17
+)
 rclcpp_components_register_node(dummy_odometry_components
   PLUGIN "dummy_odometry::DummyOdometryNode"
   EXECUTABLE dummy_odometry_node
 )
+
 install(
   TARGETS
+    dummy_odometry
     dummy_odometry_components
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
