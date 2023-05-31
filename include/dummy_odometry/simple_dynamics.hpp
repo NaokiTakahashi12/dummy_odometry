@@ -62,7 +62,6 @@ private:
   std::mutex m_command_mutex;
 
   Pose m_dest_pose_velocity;
-  Pose m_pose;
   Vector m_position;
   Quaternion m_quaternion;
 

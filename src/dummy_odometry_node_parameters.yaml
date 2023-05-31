@@ -73,7 +73,7 @@ dummy_odometry_node:
       default_value: 12.0
     inertia:
       type: double
-      default_value: 0.02
+      default_value: 0.2
     spring:
       x:
         type: double
@@ -105,17 +105,17 @@ dummy_odometry_node:
         default_value: 200.0
       roll:
         type: double
-        default_value: 0.01
+        default_value: 0.5
       pitch:
         type: double
-        default_value: 0.01
+        default_value: 0.5
       yaw:
         type: double
-        default_value: 0.01
+        default_value: 0.5
     feedback_gains:
       k1:
         type: double
-        default_value: 0.02
+        default_value: 0.0
       k2:
         type: double
         default_value: 0.002

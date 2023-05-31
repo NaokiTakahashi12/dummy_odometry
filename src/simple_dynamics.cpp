@@ -34,7 +34,18 @@ namespace dummy_odometry
 template<typename Scalar>
 SimpleDynamics<Scalar>::SimpleDynamics(
   const SimpleDynamicsParameters<Scalar> & param)
+: m_command_mutex(),
+  m_dest_pose_velocity(),
+  m_position(),
+  m_quaternion(),
+  m_pose_state_space()
 {
+  m_dest_pose_velocity = m_dest_pose_velocity.Zero();
+  m_position = m_position.Zero();
+  m_quaternion.x() = 0;
+  m_quaternion.y() = 0;
+  m_quaternion.z() = 0;
+  m_quaternion.w() = 1;
   for (unsigned int i = 0; i < pose_size; ++i) {
     m_pose_state_space[i] = std::make_unique<state_space::MDK<Scalar>>(
       param.mdk_params[i]
@@ -113,20 +124,24 @@ SimpleDynamics<Scalar>::Quaternion SimpleDynamics<Scalar>::getAngularPosition()
 template<typename Scalar>
 void SimpleDynamics<Scalar>::updateOdometry()
 {
+  static Pose pose{};
+  static Pose past_pose{};
+  static Vector diff_position{};
   std::lock_guard<std::mutex> lock{m_command_mutex};
   unsigned int i = 0;
   for (auto && pss : m_pose_state_space) {
     if (not pss) {
       throw std::runtime_error("m_pose_state_space has null");
     }
-    m_pose(i) = pss->updateStateFromVelocity(m_dest_pose_velocity(i));
+    pose(i) = pss->updateStateFromVelocity(m_dest_pose_velocity(i));
     i++;
   }
-  m_quaternion = Eigen::AngleAxis<Scalar>(m_pose(5), Vector::UnitZ());
-  m_quaternion = m_quaternion * Eigen::AngleAxis<Scalar>(m_pose(4), Vector::UnitY());
-  m_quaternion = m_quaternion * Eigen::AngleAxis<Scalar>(m_pose(3), Vector::UnitX());
-  m_position = m_pose.block(0, 0, 3, 1);
-  m_position = m_quaternion * m_position;
+  m_quaternion = Eigen::AngleAxis<Scalar>(pose(5), Vector::UnitZ());
+  m_quaternion = m_quaternion * Eigen::AngleAxis<Scalar>(pose(4), Vector::UnitY());
+  m_quaternion = m_quaternion * Eigen::AngleAxis<Scalar>(pose(3), Vector::UnitX());
+  diff_position = pose.block(0, 0, 3, 1) - past_pose.block(0, 0, 3, 1);
+  past_pose = pose;
+  m_position += m_quaternion * diff_position;
 }
 
 template class SimpleDynamics<float>;

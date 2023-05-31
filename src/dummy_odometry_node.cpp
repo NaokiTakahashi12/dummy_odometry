@@ -311,6 +311,7 @@ void DummyOdometryNode::updateOdometryCallback()
     odom_q = odom_q * vel_q;
     odom_l = m_delta_time * (odom_q * vel_l) + odom_l;
   } else if ("simple_dynamics" == m_params->simulate_odometry_method) {
+    m_simple_dynamics->setDeltaTime(m_delta_time);
     m_simple_dynamics->setDestVelocity(vel_l);
     m_simple_dynamics->setDestAngularVelocity(vel_q);
     m_simple_dynamics->updateOdometry();
