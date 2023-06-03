@@ -156,6 +156,7 @@ DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
   SimpleDynamicsParameters<float> simple_dynamics_params;
   loadSimpleDynamicsParam(*m_params, simple_dynamics_params);
   m_simple_dynamics = std::make_unique<SimpleDynamics<float>>(simple_dynamics_params);
+  m_simple_dynamics->setDeltaTime(m_delta_time);
 
   const unsigned int update_odometry_milliseconds = 1e3 / m_params->update_odometry_frequency;
   m_update_odometry_timer = this->create_wall_timer(
@@ -289,18 +290,9 @@ void DummyOdometryNode::updateOdometryCallback()
   Eigen::Quaternion<float> odom_q{};
   Eigen::Quaternion<float> vel_q{};
 
-  eigenVectorFromRosPoint3(
-    m_odometry->pose.pose.position,
-    odom_l
-  );
-  eigenQuaternionFromRosQuaternion(
-    m_odometry->pose.pose.orientation,
-    odom_q
-  );
-  eigenVectorFromRosVector3(
-    m_command_velocity->twist.linear,
-    vel_l
-  );
+  eigenVectorFromRosPoint3(m_odometry->pose.pose.position, odom_l);
+  eigenQuaternionFromRosQuaternion(m_odometry->pose.pose.orientation, odom_q);
+  eigenVectorFromRosVector3(m_command_velocity->twist.linear, vel_l);
   eigenQuaternionFromRosVector3(
     m_command_velocity->twist.angular,
     vel_q,
@@ -311,9 +303,8 @@ void DummyOdometryNode::updateOdometryCallback()
     odom_q = odom_q * vel_q;
     odom_l = m_delta_time * (odom_q * vel_l) + odom_l;
   } else if ("simple_dynamics" == m_params->simulate_odometry_method) {
-    m_simple_dynamics->setDeltaTime(m_delta_time);
-    m_simple_dynamics->setDestVelocity(vel_l);
     m_simple_dynamics->setDestAngularVelocity(vel_q);
+    m_simple_dynamics->setDestVelocity(vel_l);
     m_simple_dynamics->updateOdometry();
     odom_q = m_simple_dynamics->getAngularPosition();
     odom_l = m_simple_dynamics->getPosition();
@@ -323,15 +314,10 @@ void DummyOdometryNode::updateOdometryCallback()
       "Unknown simulate_odometry_method: "
         << m_params->simulate_odometry_method
     );
+    return;
   }
-  rosVector3FromEigenPoint3(
-    odom_l,
-    m_odometry->pose.pose.position
-  );
-  rosQuaternionFromEigenQuaternion(
-    odom_q,
-    m_odometry->pose.pose.orientation
-  );
+  rosVector3FromEigenPoint3(odom_l, m_odometry->pose.pose.position);
+  rosQuaternionFromEigenQuaternion(odom_q, m_odometry->pose.pose.orientation);
   m_odometry->header.stamp = this->get_clock()->now();
 }
 
@@ -367,7 +353,10 @@ void DummyOdometryNode::publishOdometryCallback()
     throw std::runtime_error("m_odometry_publisher is null");
   }
   publishTransformCallback(*m_odometry);
-  m_odometry_publisher->publish(*m_odometry);
+  {
+    std::lock_guard<std::mutex> lock{m_odometry_mutex};
+    m_odometry_publisher->publish(*m_odometry);
+  }
 }
 
 std_msgs::msg::Header::UniquePtr DummyOdometryNode::generateOdometryHeaderMsg()
