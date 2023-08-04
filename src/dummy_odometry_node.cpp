@@ -264,9 +264,9 @@ void DummyOdometryNode::updateOdometryCallback()
   if (not m_command_velocity) {
     RCLCPP_WARN_STREAM(
       this->get_logger(),
-      "Not recieved command velocity. waiting "
-        << m_params->wait_command_seconds
-        << " [s]"
+      "Not recieved command velocity. waiting " <<
+        m_params->wait_command_seconds <<
+        " [s]"
     );
     std::this_thread::sleep_for(
       std::chrono::milliseconds(
@@ -311,8 +311,8 @@ void DummyOdometryNode::updateOdometryCallback()
   } else {
     RCLCPP_WARN_STREAM(
       this->get_logger(),
-      "Unknown simulate_odometry_method: "
-        << m_params->simulate_odometry_method
+      "Unknown simulate_odometry_method: " <<
+        m_params->simulate_odometry_method
     );
     return;
   }
