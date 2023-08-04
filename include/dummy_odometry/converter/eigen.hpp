@@ -79,11 +79,11 @@ void eigenQuaternionFromRosVector3(
   const Scalar scaler = 1)
 {
   q = Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.z), Eigen::Vector3<Scalar>::UnitZ());
+    scaler * static_cast<Scalar>(msg.z), Eigen::Matrix<Scalar, 1, 3>::UnitZ());
   q = q * Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.y), Eigen::Vector3<Scalar>::UnitY());
+    scaler * static_cast<Scalar>(msg.y), Eigen::Matrix<Scalar, 1, 3>::UnitY());
   q = q * Eigen::AngleAxis<Scalar>(
-    scaler * static_cast<Scalar>(msg.x), Eigen::Vector3<Scalar>::UnitX());
+    scaler * static_cast<Scalar>(msg.x), Eigen::Matrix<Scalar, 1, 3>::UnitX());
 }
 
 template<typename Scalar>
