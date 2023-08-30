@@ -84,8 +84,8 @@ private:
 
   bool assertCommandVelocity(const geometry_msgs::msg::TwistStamped &);
   bool assertCommandVelocity(const geometry_msgs::msg::Twist &);
-  void commandVelocityStampedCallback(geometry_msgs::msg::TwistStamped::ConstSharedPtr);
-  void commandVelocityCallback(geometry_msgs::msg::Twist::ConstSharedPtr);
+  void commandVelocityStampedCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr &);
+  void commandVelocityCallback(const geometry_msgs::msg::Twist::ConstSharedPtr &);
 
   void updateOdometryCallback();
 
@@ -219,7 +219,7 @@ bool DummyOdometryNode::assertCommandVelocity(const geometry_msgs::msg::Twist & 
 }
 
 void DummyOdometryNode::commandVelocityStampedCallback(
-  geometry_msgs::msg::TwistStamped::ConstSharedPtr msg)
+  const geometry_msgs::msg::TwistStamped::ConstSharedPtr & msg)
 {
   std::lock_guard<std::mutex> lock{m_command_velocity_mutex};
   if (assertCommandVelocity(*msg)) {
@@ -234,7 +234,8 @@ void DummyOdometryNode::commandVelocityStampedCallback(
   m_command_velocity->twist = msg->twist;
 }
 
-void DummyOdometryNode::commandVelocityCallback(geometry_msgs::msg::Twist::ConstSharedPtr msg)
+void DummyOdometryNode::commandVelocityCallback(
+  const geometry_msgs::msg::Twist::ConstSharedPtr & msg)
 {
   if (not m_params) {
     throw std::runtime_error("m_params is null");
