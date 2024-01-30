@@ -22,12 +22,12 @@
 
 #pragma once
 
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+
 #include <memory>
 #include <array>
 #include <mutex>
-
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 
 #include "simple_dynamics_parameters.hpp"
 #include "state_space/mdk_parameters.hpp"
@@ -44,7 +44,7 @@ public:
   using Quaternion = Eigen::Quaternion<Scalar>;
   using Pose = Eigen::Matrix<Scalar, 6, 1>;
 
-  SimpleDynamics(const SimpleDynamicsParameters<Scalar> &);
+  explicit SimpleDynamics(const SimpleDynamicsParameters<Scalar> &);
 
   void setDestVelocity(const Vector &);
   void setDestAngularVelocity(const Quaternion &);

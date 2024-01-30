@@ -20,15 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <cmath>
+#include <tf2/exceptions.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
+#include <cmath>
 #include <memory>
 #include <functional>
 #include <chrono>
 #include <thread>
-
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -40,22 +41,17 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
-
-#include <tf2/exceptions.h>
-#include <tf2_ros/transform_broadcaster.h>
-
-#include <dummy_odometry_node_parameters.hpp>
-
 #include <dummy_odometry/converter/eigen.hpp>
 #include <dummy_odometry/converter/state_space.hpp>
 #include <dummy_odometry/simple_dynamics.hpp>
+#include <dummy_odometry_node_parameters.hpp>
 
 namespace dummy_odometry
 {
 class DummyOdometryNode : public rclcpp::Node
 {
 public:
-  DummyOdometryNode(const rclcpp::NodeOptions &);
+  explicit DummyOdometryNode(const rclcpp::NodeOptions &);
   ~DummyOdometryNode();
 
 private:
@@ -194,7 +190,7 @@ bool isNaNVector3(const geometry_msgs::msg::Vector3 & msg)
 
 bool DummyOdometryNode::assertCommandVelocity(const geometry_msgs::msg::TwistStamped & msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   if (msg.header.frame_id != m_params->child_frame_id) {
@@ -220,7 +216,7 @@ void DummyOdometryNode::commandVelocityStampedCallback(
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_INFO_STREAM(this->get_logger(), "First recived command velocity with timestamp");
     m_command_velocity = std::make_unique<geometry_msgs::msg::TwistStamped>();
   }
@@ -231,14 +227,14 @@ void DummyOdometryNode::commandVelocityStampedCallback(
 void DummyOdometryNode::commandVelocityCallback(
   const geometry_msgs::msg::Twist::ConstSharedPtr & msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   if (assertCommandVelocity(*msg)) {
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_INFO_STREAM(this->get_logger(), "First recived command velocity");
     m_command_velocity = std::make_unique<geometry_msgs::msg::TwistStamped>();
   }
@@ -249,13 +245,13 @@ void DummyOdometryNode::commandVelocityCallback(
 
 void DummyOdometryNode::updateOdometryCallback()
 {
-  if (not m_odometry) {
+  if (!m_odometry) {
     throw std::runtime_error("m_odometry is null");
   }
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_WARN_STREAM(
       this->get_logger(),
       "Not recieved command velocity. waiting "
@@ -315,14 +311,14 @@ void DummyOdometryNode::updateOdometryCallback()
 
 void DummyOdometryNode::publishTransformCallback(const nav_msgs::msg::Odometry & odom_msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   if (odom_msg.child_frame_id.empty()) {
     RCLCPP_WARN(this->get_logger(), "odom_msg child_frame_id is empty");
     return;
   }
-  if (not m_tf_broadcaster) {
+  if (!m_tf_broadcaster) {
     return;
   }
   auto odom_to_base_transform_msg = std::make_unique<geometry_msgs::msg::TransformStamped>();
@@ -337,10 +333,10 @@ void DummyOdometryNode::publishTransformCallback(const nav_msgs::msg::Odometry &
 
 void DummyOdometryNode::publishOdometryCallback()
 {
-  if (not m_odometry) {
+  if (!m_odometry) {
     throw std::runtime_error("m_odometry is null");
   }
-  if (not m_odometry_publisher) {
+  if (!m_odometry_publisher) {
     throw std::runtime_error("m_odometry_publisher is null");
   }
   publishTransformCallback(*m_odometry);
@@ -351,7 +347,7 @@ void DummyOdometryNode::publishOdometryCallback()
 
 std_msgs::msg::Header::UniquePtr DummyOdometryNode::generateOdometryHeaderMsg()
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   auto odom_header_msg = std::make_unique<std_msgs::msg::Header>();

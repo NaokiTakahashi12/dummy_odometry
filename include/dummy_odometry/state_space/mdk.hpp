@@ -22,9 +22,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include <Eigen/Dense>
+
+#include <memory>
 
 #include "mdk_parameters.hpp"
 
@@ -35,7 +35,7 @@ template<typename Scalar>
 class MDK
 {
 public:
-  MDK(const MDKParameters<Scalar> &);
+  explicit MDK(const MDKParameters<Scalar> &);
   ~MDK();
 
   void setDeltaTime(const Scalar delta_time);
