@@ -25,7 +25,6 @@
 #include <memory>
 #include <functional>
 #include <chrono>
-#include <mutex>
 #include <thread>
 
 #include <Eigen/Dense>
@@ -64,8 +63,6 @@ private:
 
   float m_delta_time;
 
-  std::mutex m_command_velocity_mutex;
-  std::mutex m_odometry_mutex;
   geometry_msgs::msg::TwistStamped::UniquePtr m_command_velocity;
   nav_msgs::msg::Odometry::UniquePtr m_odometry;
 
@@ -97,8 +94,6 @@ private:
 
 DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
 : rclcpp::Node(m_this_node_name, node_options),
-  m_command_velocity_mutex(),
-  m_odometry_mutex(),
   m_command_velocity(nullptr),
   m_odometry(nullptr),
   m_stamped_cmd_vel_subscription(nullptr),
@@ -221,7 +216,6 @@ bool DummyOdometryNode::assertCommandVelocity(const geometry_msgs::msg::Twist & 
 void DummyOdometryNode::commandVelocityStampedCallback(
   const geometry_msgs::msg::TwistStamped::ConstSharedPtr & msg)
 {
-  std::lock_guard<std::mutex> lock{m_command_velocity_mutex};
   if (assertCommandVelocity(*msg)) {
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
@@ -240,7 +234,6 @@ void DummyOdometryNode::commandVelocityCallback(
   if (not m_params) {
     throw std::runtime_error("m_params is null");
   }
-  std::lock_guard<std::mutex> lock{m_command_velocity_mutex};
   if (assertCommandVelocity(*msg)) {
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
@@ -276,8 +269,6 @@ void DummyOdometryNode::updateOdometryCallback()
     );
     return;
   }
-  std::lock_guard<std::mutex> command_lock{m_command_velocity_mutex};
-  std::lock_guard<std::mutex> odometry_lock{m_odometry_mutex};
 
   if (m_command_velocity->header.frame_id != m_params->child_frame_id) {
     RCLCPP_WARN_STREAM(
@@ -334,7 +325,6 @@ void DummyOdometryNode::publishTransformCallback(const nav_msgs::msg::Odometry &
   if (not m_tf_broadcaster) {
     return;
   }
-  std::lock_guard<std::mutex> lock{m_odometry_mutex};
   auto odom_to_base_transform_msg = std::make_unique<geometry_msgs::msg::TransformStamped>();
   odom_to_base_transform_msg->header = odom_msg.header;
   odom_to_base_transform_msg->child_frame_id = odom_msg.child_frame_id;
@@ -355,7 +345,6 @@ void DummyOdometryNode::publishOdometryCallback()
   }
   publishTransformCallback(*m_odometry);
   {
-    std::lock_guard<std::mutex> lock{m_odometry_mutex};
     m_odometry_publisher->publish(*m_odometry);
   }
 }
