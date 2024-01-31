@@ -21,6 +21,8 @@
 // SOFTWARE.
 
 #include <tf2/exceptions.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -68,6 +70,8 @@ private:
   rclcpp::TimerBase::SharedPtr m_update_odometry_timer;
   rclcpp::TimerBase::SharedPtr m_publish_odometry_timer;
 
+  std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+  std::unique_ptr<tf2_ros::TransformListener> m_tf_listener;
   std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
 
   std::unique_ptr<dummy_odometry_node::ParamListener> m_param_listener;
@@ -99,6 +103,8 @@ DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
   m_odometry_publisher(nullptr),
   m_update_odometry_timer(nullptr),
   m_publish_odometry_timer(nullptr),
+  m_tf_buffer(nullptr),
+  m_tf_listener(nullptr),
   m_tf_broadcaster(nullptr),
   m_param_listener(nullptr),
   m_params(nullptr)
@@ -111,14 +117,34 @@ DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
   m_params = std::make_unique<dummy_odometry_node::Params>(
     m_param_listener->get_params()
   );
-  if (m_params->tf_broadcast) {
-    m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-  } else {
-    RCLCPP_DEBUG(this->get_logger(), "Disable tf_broadcast");
-  }
   m_odometry = std::make_unique<nav_msgs::msg::Odometry>();
   m_odometry->header = *generateOdometryHeaderMsg();
   m_odometry->child_frame_id = m_params->child_frame_id;
+
+  if (m_params->tf_broadcast) {
+    m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    m_tf_listener = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
+    m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+    try {
+      geometry_msgs::msg::TransformStamped tf_msg;
+      tf_msg = m_tf_buffer->lookupTransform(
+        m_odometry->child_frame_id,
+        m_odometry->header.frame_id,
+        tf2::TimePointZero);
+      m_odometry->pose.pose.position.x = tf_msg.transform.translation.x;
+      m_odometry->pose.pose.position.y = tf_msg.transform.translation.y;
+      m_odometry->pose.pose.position.z = tf_msg.transform.translation.z;
+      m_odometry->pose.pose.orientation.x = tf_msg.transform.rotation.x;
+      m_odometry->pose.pose.orientation.y = tf_msg.transform.rotation.y;
+      m_odometry->pose.pose.orientation.z = tf_msg.transform.rotation.z;
+      m_odometry->pose.pose.orientation.w = tf_msg.transform.rotation.w;
+      RCLCPP_INFO(this->get_logger(), "Overwrite initial odometry from tf");
+    } catch (const tf2::TransformException & e) {
+      RCLCPP_WARN(this->get_logger(), e.what());
+    }
+  } else {
+    RCLCPP_DEBUG(this->get_logger(), "Disable tf_broadcast");
+  }
   if (m_params->require_command_timestamp) {
     m_stamped_cmd_vel_subscription = this->create_subscription<geometry_msgs::msg::TwistStamped>(
       "~/cmd_vel_stamped",
