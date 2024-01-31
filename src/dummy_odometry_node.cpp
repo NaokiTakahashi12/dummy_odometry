@@ -89,7 +89,9 @@ private:
 };
 
 DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
-: rclcpp::Node(m_this_node_name, node_options),
+: rclcpp::Node(
+    m_this_node_name,
+    rclcpp::NodeOptions(node_options).use_intra_process_comms(true)),
   m_command_velocity(nullptr),
   m_odometry(nullptr),
   m_stamped_cmd_vel_subscription(nullptr),
