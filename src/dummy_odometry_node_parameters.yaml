@@ -59,7 +59,7 @@ dummy_odometry_node:
     description: Enable TF broadcast
   simulate_odometry_method:
     type: string
-    default_value: sum
+    default_value: simple_dynamics
     description: Simulate command to odometry method
     validation:
       not_empty<>:

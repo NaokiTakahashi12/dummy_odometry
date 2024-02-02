@@ -100,7 +100,7 @@ void SimpleDynamics<Scalar>::setDeltaTime(const Scalar delta_time)
 {
   std::lock_guard<std::mutex> lock{m_command_mutex};
   for (auto && pss : m_pose_state_space) {
-    if (not pss) {
+    if (!pss) {
       throw std::runtime_error("m_pose_state_space has null");
     }
     pss->setDeltaTime(delta_time);
@@ -130,7 +130,7 @@ void SimpleDynamics<Scalar>::updateOdometry()
   std::lock_guard<std::mutex> lock{m_command_mutex};
   unsigned int i = 0;
   for (auto && pss : m_pose_state_space) {
-    if (not pss) {
+    if (!pss) {
       throw std::runtime_error("m_pose_state_space has null");
     }
     pose(i) = pss->updateStateFromVelocity(m_dest_pose_velocity(i));

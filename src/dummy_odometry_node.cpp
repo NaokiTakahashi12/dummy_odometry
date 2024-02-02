@@ -20,16 +20,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <cmath>
+#include <tf2/exceptions.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
+#include <cmath>
 #include <memory>
 #include <functional>
 #include <chrono>
-#include <mutex>
 #include <thread>
-
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -41,22 +43,17 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
-
-#include <tf2/exceptions.h>
-#include <tf2_ros/transform_broadcaster.h>
-
-#include <dummy_odometry_node_parameters.hpp>
-
 #include <dummy_odometry/converter/eigen.hpp>
 #include <dummy_odometry/converter/state_space.hpp>
 #include <dummy_odometry/simple_dynamics.hpp>
+#include <dummy_odometry_node_parameters.hpp>
 
 namespace dummy_odometry
 {
 class DummyOdometryNode : public rclcpp::Node
 {
 public:
-  DummyOdometryNode(const rclcpp::NodeOptions &);
+  explicit DummyOdometryNode(const rclcpp::NodeOptions &);
   ~DummyOdometryNode();
 
 private:
@@ -64,8 +61,6 @@ private:
 
   float m_delta_time;
 
-  std::mutex m_command_velocity_mutex;
-  std::mutex m_odometry_mutex;
   geometry_msgs::msg::TwistStamped::UniquePtr m_command_velocity;
   nav_msgs::msg::Odometry::UniquePtr m_odometry;
 
@@ -75,6 +70,8 @@ private:
   rclcpp::TimerBase::SharedPtr m_update_odometry_timer;
   rclcpp::TimerBase::SharedPtr m_publish_odometry_timer;
 
+  std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+  std::unique_ptr<tf2_ros::TransformListener> m_tf_listener;
   std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
 
   std::unique_ptr<dummy_odometry_node::ParamListener> m_param_listener;
@@ -96,9 +93,9 @@ private:
 };
 
 DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
-: rclcpp::Node(m_this_node_name, node_options),
-  m_command_velocity_mutex(),
-  m_odometry_mutex(),
+: rclcpp::Node(
+    m_this_node_name,
+    rclcpp::NodeOptions(node_options).use_intra_process_comms(true)),
   m_command_velocity(nullptr),
   m_odometry(nullptr),
   m_stamped_cmd_vel_subscription(nullptr),
@@ -106,6 +103,8 @@ DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
   m_odometry_publisher(nullptr),
   m_update_odometry_timer(nullptr),
   m_publish_odometry_timer(nullptr),
+  m_tf_buffer(nullptr),
+  m_tf_listener(nullptr),
   m_tf_broadcaster(nullptr),
   m_param_listener(nullptr),
   m_params(nullptr)
@@ -118,14 +117,35 @@ DummyOdometryNode::DummyOdometryNode(const rclcpp::NodeOptions & node_options)
   m_params = std::make_unique<dummy_odometry_node::Params>(
     m_param_listener->get_params()
   );
+  m_odometry = std::make_unique<nav_msgs::msg::Odometry>();
+  m_odometry->header = *generateOdometryHeaderMsg();
+  m_odometry->child_frame_id = m_params->child_frame_id;
+
+  m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  m_tf_listener = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
+  try {
+    geometry_msgs::msg::TransformStamped tf_msg;
+    tf_msg = m_tf_buffer->lookupTransform(
+      m_odometry->child_frame_id,
+      m_odometry->header.frame_id,
+      tf2::TimePointZero);
+    m_odometry->pose.pose.position.x = tf_msg.transform.translation.x;
+    m_odometry->pose.pose.position.y = tf_msg.transform.translation.y;
+    m_odometry->pose.pose.position.z = tf_msg.transform.translation.z;
+    m_odometry->pose.pose.orientation.x = tf_msg.transform.rotation.x;
+    m_odometry->pose.pose.orientation.y = tf_msg.transform.rotation.y;
+    m_odometry->pose.pose.orientation.z = tf_msg.transform.rotation.z;
+    m_odometry->pose.pose.orientation.w = tf_msg.transform.rotation.w;
+    RCLCPP_INFO(this->get_logger(), "Overwrite initial odometry from tf");
+  } catch (const tf2::TransformException & e) {
+    RCLCPP_WARN(this->get_logger(), e.what());
+  }
+
   if (m_params->tf_broadcast) {
     m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   } else {
     RCLCPP_DEBUG(this->get_logger(), "Disable tf_broadcast");
   }
-  m_odometry = std::make_unique<nav_msgs::msg::Odometry>();
-  m_odometry->header = *generateOdometryHeaderMsg();
-  m_odometry->child_frame_id = m_params->child_frame_id;
   if (m_params->require_command_timestamp) {
     m_stamped_cmd_vel_subscription = this->create_subscription<geometry_msgs::msg::TwistStamped>(
       "~/cmd_vel_stamped",
@@ -199,7 +219,7 @@ bool isNaNVector3(const geometry_msgs::msg::Vector3 & msg)
 
 bool DummyOdometryNode::assertCommandVelocity(const geometry_msgs::msg::TwistStamped & msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   if (msg.header.frame_id != m_params->child_frame_id) {
@@ -221,12 +241,11 @@ bool DummyOdometryNode::assertCommandVelocity(const geometry_msgs::msg::Twist & 
 void DummyOdometryNode::commandVelocityStampedCallback(
   const geometry_msgs::msg::TwistStamped::ConstSharedPtr & msg)
 {
-  std::lock_guard<std::mutex> lock{m_command_velocity_mutex};
   if (assertCommandVelocity(*msg)) {
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_INFO_STREAM(this->get_logger(), "First recived command velocity with timestamp");
     m_command_velocity = std::make_unique<geometry_msgs::msg::TwistStamped>();
   }
@@ -237,15 +256,14 @@ void DummyOdometryNode::commandVelocityStampedCallback(
 void DummyOdometryNode::commandVelocityCallback(
   const geometry_msgs::msg::Twist::ConstSharedPtr & msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
-  std::lock_guard<std::mutex> lock{m_command_velocity_mutex};
   if (assertCommandVelocity(*msg)) {
     RCLCPP_WARN(this->get_logger(), "Update command velocity failed");
     return;
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_INFO_STREAM(this->get_logger(), "First recived command velocity");
     m_command_velocity = std::make_unique<geometry_msgs::msg::TwistStamped>();
   }
@@ -256,13 +274,13 @@ void DummyOdometryNode::commandVelocityCallback(
 
 void DummyOdometryNode::updateOdometryCallback()
 {
-  if (not m_odometry) {
+  if (!m_odometry) {
     throw std::runtime_error("m_odometry is null");
   }
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
-  if (not m_command_velocity) {
+  if (!m_command_velocity) {
     RCLCPP_WARN_STREAM(
       this->get_logger(),
       "Not recieved command velocity. waiting "
@@ -276,8 +294,6 @@ void DummyOdometryNode::updateOdometryCallback()
     );
     return;
   }
-  std::lock_guard<std::mutex> command_lock{m_command_velocity_mutex};
-  std::lock_guard<std::mutex> odometry_lock{m_odometry_mutex};
 
   if (m_command_velocity->header.frame_id != m_params->child_frame_id) {
     RCLCPP_WARN_STREAM(
@@ -324,17 +340,16 @@ void DummyOdometryNode::updateOdometryCallback()
 
 void DummyOdometryNode::publishTransformCallback(const nav_msgs::msg::Odometry & odom_msg)
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   if (odom_msg.child_frame_id.empty()) {
     RCLCPP_WARN(this->get_logger(), "odom_msg child_frame_id is empty");
     return;
   }
-  if (not m_tf_broadcaster) {
+  if (!m_tf_broadcaster) {
     return;
   }
-  std::lock_guard<std::mutex> lock{m_odometry_mutex};
   auto odom_to_base_transform_msg = std::make_unique<geometry_msgs::msg::TransformStamped>();
   odom_to_base_transform_msg->header = odom_msg.header;
   odom_to_base_transform_msg->child_frame_id = odom_msg.child_frame_id;
@@ -347,22 +362,21 @@ void DummyOdometryNode::publishTransformCallback(const nav_msgs::msg::Odometry &
 
 void DummyOdometryNode::publishOdometryCallback()
 {
-  if (not m_odometry) {
+  if (!m_odometry) {
     throw std::runtime_error("m_odometry is null");
   }
-  if (not m_odometry_publisher) {
+  if (!m_odometry_publisher) {
     throw std::runtime_error("m_odometry_publisher is null");
   }
   publishTransformCallback(*m_odometry);
   {
-    std::lock_guard<std::mutex> lock{m_odometry_mutex};
     m_odometry_publisher->publish(*m_odometry);
   }
 }
 
 std_msgs::msg::Header::UniquePtr DummyOdometryNode::generateOdometryHeaderMsg()
 {
-  if (not m_params) {
+  if (!m_params) {
     throw std::runtime_error("m_params is null");
   }
   auto odom_header_msg = std::make_unique<std_msgs::msg::Header>();
